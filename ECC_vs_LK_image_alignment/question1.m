@@ -1,8 +1,5 @@
 %%%%%% Question 1 %%%%%%
 
-% Load Image
-% (If you have an 'img.mat' file, you can load that instead)
-% load('img.mat');
 img = rgb2gray(imread('lena.png'));
 
 %% Generate the Template - Apply a small translation to the image
