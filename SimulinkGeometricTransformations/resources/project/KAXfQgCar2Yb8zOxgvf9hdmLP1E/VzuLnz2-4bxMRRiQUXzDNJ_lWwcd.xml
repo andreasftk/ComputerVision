@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<Info File="mosaic.mdl" GroupUUID="" Icon="" Name="mosaic" Type="StartUp" Visible="0">
+    <Extension Name="StartUpPrev" Value="d1dda645-94d8-44d8-aaff-fa4bbb6e9edf"/>
+</Info>

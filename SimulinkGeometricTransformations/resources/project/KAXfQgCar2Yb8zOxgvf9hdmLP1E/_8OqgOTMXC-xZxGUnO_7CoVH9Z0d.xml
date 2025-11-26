@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<Info File="Shear.mdl" GroupUUID="" Icon="" Name="Shear" Type="StartUp" Visible="0">
+    <Extension Name="StartUpPrev" Value="1ec4d6e9-c19d-4c9c-b97b-ece3d5819fee"/>
+</Info>

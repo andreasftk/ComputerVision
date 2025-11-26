@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<Info File="corner_detection.mdl" GroupUUID="" Icon="" Name="corner_detection" Type="StartUp" Visible="0">
+    <Extension Name="StartUpPrev" Value="ee1dd644-fb13-4cc7-894f-0ecea148b1ba"/>
+</Info>
