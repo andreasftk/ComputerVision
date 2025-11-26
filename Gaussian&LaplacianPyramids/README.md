@@ -19,18 +19,20 @@ The project first documents and analyses the provided MATLAB toolbox functions: 
 
   - Gaussian pyramid: repeated Gaussian filtering and downsampling.
   - Laplacian pyramid: difference between a Gaussian level and the upsampled next level.
-- **`pyrReduce`**Applies a separable 5×5 Gaussian kernel and then downsamples by a factor of 2 in each spatial dimension.
-- **`pyrExpand`**Upsamples an image by inserting zeros between pixels and then filters with appropriately partitioned Gaussian kernels to interpolate intermediate samples.
+- **`pyrReduce`**Applies a separable 5×5 Gaussian-like kernel and then downsamples by a factor of 2 in each spatial dimension.
+- **`pyrExpand`**Upsamples an image by inserting zeros between pixels and filters to interpolate intermediate samples.
 - **`pyrBlend`**Performs blending in the Laplacian pyramid domain using Gaussian pyramids of masks to obtain smooth, scale-dependent transitions between images.
 - **`pyrReconstruct`**
   Reconstructs an image from its Laplacian pyramid by iterative expansion and summation of pyramid levels.
+
+These functions are related back to a 1D matrix formulation of filtering and sampling using Toeplitz and Kronecker product matrices.
 
 ## 1D Gaussian & Laplacian Pyramids
 
 A 1D noisy sinusoidal signal is used to:
 
 - Build a **Gaussian pyramid** by repeated convolution with the 5-tap kernel`h = (1/16) * [1 4 6 4 1]` and downsampling.
-- Construct the corresponding **Laplacian pyramid** as`L_k = G_k - Expand(G_{k+1})`.
+- Construct the corresponding **Laplacian pyramid** as`L_k = G_k − Expand(G_{k+1})`.
 - Reconstruct the original signal from the Laplacian pyramid and verify that the reconstruction error is negligible.
 
 This validates the correctness of the pyramid construction and reconstruction procedures.
@@ -40,9 +42,9 @@ This validates the correctness of the pyramid construction and reconstruction pr
 Using the classic **apple–orange** example:
 
 - Two aligned images (`apple.jpg`, `orange.jpg`) and complementary binary masks are defined.
-- The masks are feathered using Gaussian filtering to produce smooth transitions.
+- The masks are **feathered** using Gaussian filtering to produce smooth transitions.
 - Laplacian pyramids of both images and a Gaussian pyramid of the mask are computed.
-- At each level, a blended Laplacian level is formed as`B_j = G_j * L1_j + (1 - G_j) * L2_j`,where `G_j` is the mask at level `j`, and `L1_j`, `L2_j` are the Laplacian levels of the two images.
+- At each level, a blended Laplacian level is formed as`B_j = G_j * L_j^(1) + (1 − G_j) * L_j^(2)`.
 - The final blended image is reconstructed with `pyrReconstruct`.
 
 The result is a seamless hybrid image where the transition between apple and orange is visually natural across scales.
@@ -66,11 +68,18 @@ A more complex composite image is created using:
 
 For each object:
 
-1. A foreground mask is extracted (e.g. by freehand selection).
+1. A foreground mask is extracted (freehand selection).
 2. An **affine transformation** (scaling, rotation, translation) is defined and applied to both image and mask using `affine2d` and `imwarp`, optionally followed by `imtranslate`.
-3. Transformed masks satisfy:
-   - Local exclusivity: `sum_k m_k_final(n) <= 1` for all pixels `n`.
-   - Binary support: `m_k_final(n) = 1` if and only if the pixel belongs to object `k`.
+3. Transformed masks satisfy the following constraints for every pixel `n`:
+
+   - Local exclusivity:
+     $$
+     \sum_k m_k^{\text{final}}(n) \le 1.
+     $$
+   - Binary support:
+     $$
+     m_k^{\text{final}}(n) = 1 \quad \text{iff pixel } n \text{ belongs to object } k.
+     $$
 
 Blending steps:
 
@@ -91,26 +100,47 @@ This part of the project evaluates a **pre-trained PSPNet (Pyramid Scene Parsing
 
 The following resources are provided:
 
-- `pspnet.py` – PSPNet model definition
-- `cityscapes_dataset.py` – dataset class for loading and preprocessing Cityscapes images and ground-truth labels
-- `train_epoch_200_CPU.pth` – pre-trained PSPNet weights (around 200 epochs)
-- `cityscapes_val_dataset.zip` – validation images and labels
-- `cityscapes_colors.txt` – mapping of class indices to RGB colors
-- `cityscapes_names.txt` – class names corresponding to each label
+- `pspnet.py` – PSPNet model definition.
+- `cityscapes_dataset.py` – dataset class for loading and preprocessing Cityscapes images and ground-truth labels.
+- `train_epoch_200_CPU.pth` – pre-trained PSPNet weights (around 200 epochs).
+- `cityscapes_val_dataset.zip` – validation images and labels.
+- `cityscapes_colors.txt` – mapping of class indices to RGB colors.
+- `cityscapes_names.txt` – class names corresponding to each label.
 
-A new script `pspnet_eval.py` is implemented to:
+A script `pspnet_eval.py` is implemented to:
 
 - Load the pre-trained model and switch it to evaluation mode.
 - Iterate over the validation dataset and compute predictions.
-- Convert predictions and ground-truth labels into confusion matrices for each image.
+- Convert predictions and ground-truth labels into **confusion matrices** for each image.
 - Aggregate statistics to compute segmentation metrics.
 
 ## Evaluation Metric – Mean Intersection over Union (mIoU)
 
-The main metric used is **Mean Intersection over Union (mIoU)**, which is standard for semantic segmentation.
+The main metric used is **Mean Intersection over Union (mIoU)**, which is standard for semantic segmentation:
 
-For each class `c`:
+$$
+\mathrm{IoU}_c = \frac{\mathrm{TP}_c}{\mathrm{TP}_c + \mathrm{FP}_c + \mathrm{FN}_c},
+$$
 
-```text
-IoU_c = TP_c / (TP_c + FP_c + FN_c)
+where `TP`, `FP`, `FN` are true positives, false positives and false negatives for class `c`.
+
+Several variants are considered:
+
+1. **Per-class IoU over the dataset** (`IoU_D`)Accumulates `TP`, `FP`, `FN` across all images for each class.
+2. **Mean IoU over the dataset** (`mIoU_D`)Average of per-class `IoU_D` across all classes.
+3. **Per-image IoU** (`IoU_i`)Computes IoU over all classes for each individual image.
+4. **Mean IoU over images** (`mIoU_I`)
+   Average IoU across the validation images.
+
+In code, per-class IoU for one confusion matrix is computed as:
+
+```python
+def compute_mIoU(conf_matrix):
+    intersection = np.diag(conf_matrix)
+    union = conf_matrix.sum(axis=1) + conf_matrix.sum(axis=0) - intersection
+    iou = np.array([
+        intersection[i] / union[i] if union[i] > 0 else np.nan
+        for i in range(len(intersection))
+    ])
+    return iou
 ```
